@@ -13,7 +13,7 @@ import pdb
 import tensorflow as tf
 # from tensorflow.contrib import rnn
 from tensorflow.python.ops import rnn, rnn_cell
-
+import os, re
 
 # Import MNIST data
 from tensorflow.examples.tutorials.mnist import input_data
@@ -40,9 +40,13 @@ n_steps = 28 # timesteps
 n_hidden = 128 # hidden layer num of features
 n_classes = 10 # MNIST total classes (0-9 digits)
 
+save_step = 100
+if not os.path.isdir('models'):
+    os.makedirs('models')
+
 # tf Graph input
-x = tf.placeholder("float", [batch_size, n_steps, n_input])
-y = tf.placeholder("float", [batch_size, n_classes])
+x = tf.placeholder("float", [None, n_steps, n_input])
+y = tf.placeholder("float", [None, n_classes])
 
 # Define weights
 weights = {
@@ -66,7 +70,7 @@ def RNN(x, weights, biases):
 
     # Define a lstm cell with tensorflow
     lstm_cell = rnn_cell.BasicLSTMCell(n_hidden, forget_bias=1.0)
-
+    pdb.set_trace()
     # Get lstm cell output
     # outputs, states = rnn_cell.static_rnn(lstm_cell, x, dtype=tf.float32)
     outputs, states = tf.nn.rnn(lstm_cell, x, dtype=tf.float32)
@@ -90,7 +94,14 @@ init = tf.global_variables_initializer()
 # Launch the graph
 with tf.Session() as sess:
     sess.run(init)
+    saver = tf.train.Saver()
     step = 1
+    ckpt = tf.train.get_checkpoint_state('models/')
+    if ckpt and ckpt.model_checkpoint_path:
+        saver.restore(sess, ckpt.model_checkpoint_path)
+        step = int(re.search(r'\d+', ckpt.model_checkpoint_path).group()) # get step value in int
+        print ("Model restored: ", str(step))
+
     # Keep training until reach max iterations
     while step * batch_size < training_iters:
         batch_x, batch_y = mnist.train.next_batch(batch_size)
@@ -106,11 +117,17 @@ with tf.Session() as sess:
             print("Iter " + str(step*batch_size) + ", Minibatch Loss= " + \
                   "{:.6f}".format(loss) + ", Training Accuracy= " + \
                   "{:.5f}".format(acc))
+        
         step += 1
+        if (step % save_step == 0) or ((step * batch_size) >= training_iters):
+            print ('--Saving Checkpoint--')
+            saver.save(sess, 'models/model-'+str(step))
+
     print("Optimization Finished!")
 
     # Calculate accuracy for 128 mnist test images
-    test_len = 128
+    test_len = 10000
+    # pdb.set_trace()
     test_data = mnist.test.images[:test_len].reshape((-1, n_steps, n_input))
     test_label = mnist.test.labels[:test_len]
     print("Testing Accuracy:", \
